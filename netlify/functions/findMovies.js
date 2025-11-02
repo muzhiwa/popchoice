@@ -1,6 +1,11 @@
 import OpenAI from "openai";
 import { createClient } from "@supabase/supabase-js";
 
+console.log("🔍 Checking environment variables...");
+console.log("OPENAI_API_KEY exists?", !!process.env.OPENAI_API_KEY);
+console.log("SUPABASE_URL:", process.env.SUPABASE_URL);
+console.log("SUPABASE_ANON_KEY exists?", !!process.env.SUPABASE_ANON_KEY);
+
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
