@@ -1,6 +1,0 @@
-name = "openai-worker"          # 👈 pick any name you like
-main = "src/index.js"           # entry file (default)
-compatibility_date = "2024-11-01"
-
-[vars]
-# You can set other environment variables here if needed
