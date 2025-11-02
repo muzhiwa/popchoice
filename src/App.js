@@ -1,5 +1,4 @@
 import React, { useState } from "react";
-import { openai, supabase } from "./lib/config.js";
 import QuestionsView from "./components/QuestionsView.js";
 import ResultView from "./components/ResultView.js";
 import "./App.css";
