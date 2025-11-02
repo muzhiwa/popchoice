@@ -1,53 +1,70 @@
 import OpenAI from "openai";
 import { createClient } from "@supabase/supabase-js";
 
-console.log("🟢 Netlify function starting up...");
+console.log("🔍 Checking environment variables...");
+console.log("OPENAI_API_KEY exists?", !!process.env.OPENAI_API_KEY);
+console.log("SUPABASE_URL:", process.env.SUPABASE_URL);
+console.log("SUPABASE_ANON_KEY exists?", !!process.env.SUPABASE_ANON_KEY);
+
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
+
+const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_ANON_KEY
+);
 
 export const handler = async (event) => {
   try {
-    console.log("➡️ Event received:", event.httpMethod);
+    const body = JSON.parse(event.body);
+    const { favorite, mood, tone } = body;
 
-    // Debug GET
-    if (event.httpMethod === "GET") {
-      console.log("✅ Health check route hit");
+    const combined = `${favorite}. Mood: ${mood}. Tone: ${tone}.`;
+
+    // 1️⃣ Create embedding for user answers
+    const embeddingResponse = await openai.embeddings.create({
+      model: "text-embedding-3-small",
+      input: combined,
+    });
+    const userEmbedding = embeddingResponse.data[0].embedding;
+
+    // 2️⃣ Search Supabase for the closest movie
+    const { data: matches, error } = await supabase.rpc("match_movies", {
+      query_embedding: userEmbedding,
+      match_threshold: 0.1,
+      match_count: 1,
+    });
+
+    if (error) throw error;
+    if (!matches || matches.length === 0) {
       return {
-        statusCode: 200,
-        body: JSON.stringify({ ok: true, message: "Function running fine." }),
+        statusCode: 404,
+        body: JSON.stringify({ error: "No movie matches found." }),
       };
     }
 
-    // Parse body
-    const body = JSON.parse(event.body || "{}");
-    console.log("📦 Request body:", body);
+    const bestMatch = matches[0];
 
-    // Check env
-    console.log("🔍 Env vars:", {
-      hasOpenAI: !!process.env.OPENAI_API_KEY,
-      hasSupabaseURL: !!process.env.SUPABASE_URL,
-      hasSupabaseKey: !!process.env.SUPABASE_ANON_KEY,
+    // 3️⃣ Generate explanation
+    const prompt = `User is in the mood for: ${combined}. Recommend the movie "${bestMatch.title}" and explain in one friendly sentence why it's a great fit.`;
+
+    const explanationRes = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [{ role: "user", content: prompt }],
     });
 
-    // Initialize clients
-    const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-    const supabase = createClient(
-      process.env.SUPABASE_URL,
-      process.env.SUPABASE_ANON_KEY
-    );
-
-    // Simple embedding test
-    const embeddingResponse = await openai.embeddings.create({
-      model: "text-embedding-3-small",
-      input: "test",
-    });
-
-    console.log("✅ Embedding created successfully");
+    const explanation = explanationRes.choices[0].message.content;
 
     return {
       statusCode: 200,
-      body: JSON.stringify({ success: true }),
+      body: JSON.stringify({
+        movie: bestMatch,
+        explanation,
+      }),
     };
   } catch (err) {
-    console.error("❌ Function error:", err);
+    console.error(err);
     return {
       statusCode: 500,
       body: JSON.stringify({ error: err.message }),
