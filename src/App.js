@@ -11,7 +11,7 @@ function App() {
     setLoading(true);
 
     try {
-      const res = await fetch("/.netlify/functions/findMovies", {
+      const res = await fetch("/.netlify/functions/findMovie", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(answers),
